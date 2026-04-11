@@ -11,8 +11,36 @@ concommand.Add( cmd, function( ply, _, args )
 
     SENT_PERF_RUNNING = true
     ENT_METHODS_ORIGINALS = ENT_METHODS_ORIGINALS or {}
+    ENT_TABLE_ORIGINALS = ENT_TABLE_ORIGINALS or {}
 
     local lagTbl = {}
+
+    local function wrapFunction( tbl, varName, original, className )
+        local originInfo = debug.getinfo( original, "S" )
+        local entOrigin = originInfo.short_src
+        local linedefined = originInfo.linedefined
+        local perfID = entOrigin .. ":" .. tostring( linedefined )
+
+        local function wrapper( ... )
+            local sysTime = SysTime()
+            local a, b, c, d, e, f = original( ... )
+            local elapsed = SysTime() - sysTime
+
+            local info = lagTbl[perfID]
+            if not info then
+                local inCoroutine = coroutine.running()
+                info = { class = className, varName = varName, count = 0, time = 0, origin = entOrigin, linedefined = linedefined, inCoroutine = inCoroutine }
+                lagTbl[perfID] = info
+            end
+
+            info.count = info.count + 1
+            info.time = info.time + elapsed
+
+            return a, b, c, d, e, f
+        end
+
+        tbl[varName] = wrapper
+    end
 
     for _, ent in ipairs( ents.GetAll() ) do
         if not ent:IsScripted() then continue end
@@ -22,32 +50,19 @@ concommand.Add( cmd, function( ply, _, args )
         for varName, var in pairs( entTable ) do
             if not isfunction( var ) then continue end
             ENT_METHODS_ORIGINALS[ent][varName] = var
+            wrapFunction( entTable, varName, var, ent:GetClass() )
+        end
+    end
 
-            local original = ENT_METHODS_ORIGINALS[ent][varName]
-            local originInfo = debug.getinfo( original, "S" )
-            local perfID = ent:GetClass() .. ":" .. varName
-            local entOrigin = originInfo.short_src
-            local linedefined = originInfo.linedefined
+    for className, entry in pairs( scripted_ents.GetList() ) do
+        local entTable = entry.t
+        if not entTable then continue end
 
-            local function wrapper( ... )
-                local sysTime = SysTime()
-                local a, b, c, d, e, f = original( ... )
-                local elapsed = SysTime() - sysTime
-
-                local info = lagTbl[perfID]
-                if not info then
-                    local inCoroutine = coroutine.running()
-                    info = { class = ent:GetClass(), varName = varName, count = 0, time = 0, origin = entOrigin, linedefined = linedefined, inCoroutine = inCoroutine }
-                    lagTbl[perfID] = info
-                end
-
-                info.count = info.count + 1
-                info.time = info.time + elapsed
-
-                return a, b, c, d, e, f
-            end
-
-            ent[varName] = wrapper
+        ENT_TABLE_ORIGINALS[entTable] = ENT_TABLE_ORIGINALS[entTable] or {}
+        for varName, var in pairs( entTable ) do
+            if not isfunction( var ) then continue end
+            ENT_TABLE_ORIGINALS[entTable][varName] = var
+            wrapFunction( entTable, varName, var, className )
         end
     end
 
@@ -67,6 +82,14 @@ concommand.Add( cmd, function( ply, _, args )
             end
         end
 
+        for entTable, methods in pairs( ENT_TABLE_ORIGINALS ) do
+            for methodName, originalFunc in pairs( methods ) do
+                if isfunction( originalFunc ) then
+                    entTable[methodName] = originalFunc
+                end
+            end
+        end
+
         local sorted = {}
         for _, info in pairs( lagTbl ) do
             table.insert( sorted, info )
@@ -76,18 +99,39 @@ concommand.Add( cmd, function( ply, _, args )
             return a.time > b.time
         end )
 
+        local colWhite   = Color( 255, 255, 255 )
+        local colGray    = Color( 160, 160, 160 )
+        local colCyan    = Color( 100, 220, 255 )
+        local colYellow  = Color( 255, 220, 80  )
+        local colGreen   = Color( 100, 220, 120 )
+        local colOrange  = Color( 255, 160, 60  )
+        local colHeader  = Color( 220, 180, 255 )
+        local tab = "\t"
+
         local endTime = SysTime()
         local runTime = math.Round( endTime - startTime, 2 )
-        print( "Sent profiler ran for " .. runTime .. " seconds." )
-        print( "Class\tCount\tTime (seconds)\tOrigin\tLast Defined" )
+        MsgC( colYellow, "Sent profiler ran for " .. runTime .. " seconds.\n" )
+        MsgC( colHeader, "Class", tab, "Method", tab, "Count", tab, "Time (s)", tab, "Origin", tab, "Note", "\n" )
         for i = 1, 100 do
             local sort = sorted[i]
             if sort then
-                print( sort.class, sort.varName, sort.count, sort.time, sort.origin .. ":" .. sort.linedefined, sort.inCoroutine and "in coroutine, result may be inaccurate" or "" )
+                MsgC(
+                    colCyan,   sort.class,
+                    colGray,   tab,
+                    colWhite,  sort.varName,
+                    colGray,   tab,
+                    colYellow, tostring( sort.count ),
+                    colGray,   tab,
+                    colGreen,  tostring( math.Round( sort.time, 6 ) ),
+                    colGray,   tab .. sort.origin .. ":" .. sort.linedefined .. tab,
+                    colOrange, sort.inCoroutine and "in coroutine, result may be inaccurate" or "",
+                    colWhite,  "\n"
+                )
             end
         end
 
         SENT_PERF_RUNNING = nil
         ENT_METHODS_ORIGINALS = nil
+        ENT_TABLE_ORIGINALS = nil
     end )
 end )
