@@ -95,12 +95,11 @@ concommand.Add( cmd, function( ply, _, args )
         local allHooks = hook.GetTable()
         for hookName, hookTable in pairs( allHooks ) do
             for hookEvent in pairs( hookTable ) do
-                if not allHooks[hookName] or not allHooks[hookName][hookEvent] then
-                    continue
-                end
+                local orig = HOOK_PERF_ORIGINALS[hookName] and HOOK_PERF_ORIGINALS[hookName][hookEvent]
+                if not orig then continue end
 
                 hook.Remove( hookName, hookEvent )
-                hook.Add( hookName, hookEvent, HOOK_PERF_ORIGINALS[hookName][hookEvent] )
+                hook.Add( hookName, hookEvent, orig )
             end
         end
 
