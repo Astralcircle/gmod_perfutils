@@ -14,6 +14,7 @@ Either clone/download the repository and put it in your `addons/` folder or run 
 | `sh_net_logger.lua` | `red_(sv/cl)_netlogger_start` `red_(sv/cl)_netlogger_stop`  `red_(sv/cl)_netlogger_ignore` | Starts the netlogger, all incomming net.* functions will be printed to console in order as they're being read. Spammy net messages can be ignored using `red_(sv/cl)_netlogger_ignore netmsgname` |
 | `sv_net_dumper.lua` | `red_sv_netdump` | This script will find all `net.Receive` function origins and dump their files to the data folder. This can be useful for locating badly performing hooks and exploits. |
 | `sh_sentperf.lua` | `red_sv_sentperf` `red_cl_sentperf` | This script will log the time taken to run each method on all scripted entities over the span of the amount of time given, defaults to 10 seconds. This can be useful to find laggy methods without having to use something as heavy as FProfiler as that can cause significant lag while active, thus being hard to use on servers. |
+| `sh_physobjperf.lua` | `red_sv_physobjperf` `red_cl_physobjperf` | This script will log the time taken to run each method on the PhysObj metatable (found via `FindMetaTable( TYPE_PHYSOBJ )`) over the span of the amount of time given, defaults to 10 seconds. This can be useful to find laggy physics object calls as gmod loops over ALL physics objects each anything is done with them. |
 
 ## Extra tools
 Tools i often use and can recommend for performance profiling.
