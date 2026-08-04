@@ -1,7 +1,9 @@
 local perfTable = {}
 local bitTable = {}
+local countTable = {}
 local umsgTable = {}
 local umsgBitTable = {}
+local umsgCountTable = {}
 local totalStartTime = 0
 local running = false
 
@@ -20,6 +22,7 @@ local function applyWrap()
         local elapsed = SysTime() - start
         umsgTable[name] = ( umsgTable[name] or 0 ) + elapsed
         umsgBitTable[name] = ( umsgBitTable[name] or 0 ) + bits
+        umsgCountTable[name] = ( umsgCountTable[name] or 0 ) + 1
     end
 
     function net.Incoming( len, client )
@@ -32,6 +35,7 @@ local function applyWrap()
         end
 
         bitTable[strName] = ( bitTable[strName] or 0 ) + len
+        countTable[strName] = ( countTable[strName] or 0 ) + 1
         local start = SysTime()
 
         net_Incoming( len, client )
@@ -58,8 +62,10 @@ concommand.Add( SERVER and "red_sv_netperf_start" or "red_cl_netperf_start", fun
     totalStartTime = SysTime()
     table.Empty( perfTable )
     table.Empty( bitTable )
+    table.Empty( countTable )
     table.Empty( umsgTable )
     table.Empty( umsgBitTable )
+    table.Empty( umsgCountTable )
     table.Empty( nw2Table )
 
     applyWrap()
@@ -78,49 +84,78 @@ concommand.Add( SERVER and "red_sv_netperf_stop" or "red_cl_netperf_stop", funct
     end
 
     running = false
-    print( "Netperf netresults:\n" )
+
+    local colWhite   = Color( 255, 255, 255 )
+    local colGray    = Color( 160, 160, 160 )
+    local colCyan    = Color( 100, 220, 255 )
+    local colYellow  = Color( 255, 220, 80  )
+    local colGreen   = Color( 100, 220, 120 )
+    local colHeader  = Color( 220, 180, 255 )
+    local tab = "\t"
+
+    MsgC( colYellow, "Netperf ran for " .. math.Round( SysTime() - totalStartTime, 2 ) .. " seconds.\n" )
 
     if next( perfTable ) then
-        print( "Netmessages Sorted by time:\n" )
-        local perfstr = ""
+        MsgC( colHeader, "Netmessages sorted by time:\n" )
+        MsgC( colHeader, "Name", tab, "Time (s)", tab, "Bits", tab, "Count", "\n" )
         for k, v in SortedPairsByValue( perfTable, true ) do
-            perfstr = perfstr .. k .. " - " .. v .. "s - " .. bitTable[k] .. " bits\n"
+            MsgC( colCyan, k, colGray, tab, colGreen, tostring( math.Round( v, 6 ) ), colGray, tab, colYellow, tostring( bitTable[k] ), colGray, tab, colWhite, tostring( countTable[k] or 0 ), colWhite, "\n" )
         end
-        print( perfstr )
 
-        print( "Netmessages Sorted by bits:\n" )
-        local bitstr = ""
+        MsgC( colHeader, "\nNetmessages sorted by bits:\n" )
+        MsgC( colHeader, "Name", tab, "Bits", tab, "Time (s)", tab, "Count", "\n" )
         for k, v in SortedPairsByValue( bitTable, true ) do
-            bitstr = bitstr .. k .. " - " .. v .. " bits - " .. perfTable[k] .. "s\n"
+            MsgC( colCyan, k, colGray, tab, colYellow, tostring( v ), colGray, tab, colGreen, tostring( math.Round( perfTable[k], 6 ) ), colGray, tab, colWhite, tostring( countTable[k] or 0 ), colWhite, "\n" )
         end
-        print( bitstr )
+
+        local totalCount, totalTime = 0, 0
+        for name, time in pairs( perfTable ) do
+            totalCount = totalCount + ( countTable[name] or 0 )
+            totalTime = totalTime + time
+        end
+
+        local totalBitCount = 0
+        for _, bits in pairs( bitTable ) do
+            totalBitCount = totalBitCount + bits
+        end
+
+        MsgC( colHeader, "\nTotal netmessages: ", colWhite, tostring( totalCount ), colHeader, ", total time: ", colGreen, tostring( math.Round( totalTime, 6 ) ) .. "s", colHeader, ", total bits: ", colYellow, tostring( totalBitCount ), colWhite, "\n\n" )
     end
 
     if next( nw2Table ) then
-        print( "NW2 Sorted by count:\n" )
+        MsgC( colHeader, "NW2 sorted by count:\n" )
+        MsgC( colHeader, "Name", tab, "Count", "\n" )
         for k, v in SortedPairsByValue( nw2Table, true ) do
-            print( "NW2: " .. k .. " - " .. v .. " times" )
+            MsgC( colCyan, k, colGray, tab, colWhite, tostring( v ), colWhite, "\n" )
         end
-        print( "" )
+        MsgC( colWhite, "\n" )
     end
 
     if next( umsgTable ) then
-        print( "Usermessages Sorted by time:\n" )
-        local umsgstr = ""
+        MsgC( colHeader, "Usermessages sorted by time:\n" )
+        MsgC( colHeader, "Name", tab, "Time (s)", tab, "Bits", tab, "Count", "\n" )
         for k, v in SortedPairsByValue( umsgTable, true ) do
-            umsgstr = umsgstr .. k .. " - " .. v .. "s - " .. ( umsgBitTable[k] or 0 ) .. " bits\n"
+            MsgC( colCyan, k, colGray, tab, colGreen, tostring( math.Round( v, 6 ) ), colGray, tab, colYellow, tostring( umsgBitTable[k] or 0 ), colGray, tab, colWhite, tostring( umsgCountTable[k] or 0 ), colWhite, "\n" )
         end
-        print( umsgstr )
 
-        print( "Usermessages Sorted by bits:\n" )
-        local umsgbitstr = ""
+        MsgC( colHeader, "\nUsermessages sorted by bits:\n" )
+        MsgC( colHeader, "Name", tab, "Bits", tab, "Time (s)", tab, "Count", "\n" )
         for k, v in SortedPairsByValue( umsgBitTable, true ) do
-            umsgbitstr = umsgbitstr .. k .. " - " .. v .. " bits - " .. ( umsgTable[k] or 0 ) .. "s\n"
+            MsgC( colCyan, k, colGray, tab, colYellow, tostring( v ), colGray, tab, colGreen, tostring( math.Round( umsgTable[k] or 0, 6 ) ), colGray, tab, colWhite, tostring( umsgCountTable[k] or 0 ), colWhite, "\n" )
         end
-        print( umsgbitstr )
-    end
 
-    print( "Time ran: " .. ( SysTime() - totalStartTime ) .. "s" )
+        local totalUmsgCount, totalUmsgTime = 0, 0
+        for name, time in pairs( umsgTable ) do
+            totalUmsgCount = totalUmsgCount + ( umsgCountTable[name] or 0 )
+            totalUmsgTime = totalUmsgTime + time
+        end
+        local totalUmsgBitCount = 0
+        for _, bits in pairs( umsgBitTable ) do
+            totalUmsgBitCount = totalUmsgBitCount + bits
+        end
+
+        MsgC( colHeader, "\nTotal usermessages: ", colWhite, tostring( totalUmsgCount ), colHeader, ", total time: ", colGreen, tostring( math.Round( totalUmsgTime, 6 ) ) .. "s", colHeader, ", total bits: ", colYellow, tostring( totalUmsgBitCount ), colWhite, "\n" )
+    end
 
     net.Incoming = netperf_net_Incoming
     net.ReadHeader = net_ReadHeader

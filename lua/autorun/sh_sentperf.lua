@@ -130,6 +130,14 @@ concommand.Add( cmd, function( ply, _, args )
             end
         end
 
+        local totalCount, totalTime = 0, 0
+        for _, info in pairs( lagTbl ) do
+            totalCount = totalCount + info.count
+            totalTime = totalTime + info.time
+        end
+
+        MsgC( colHeader, "Total", colGray, tab, colYellow, tostring( totalCount ), colGray, tab, colGreen, tostring( math.Round( totalTime, 6 ) ), colWhite, "\n" )
+
         SENT_PERF_RUNNING = nil
         ENT_METHODS_ORIGINALS = nil
         ENT_TABLE_ORIGINALS = nil
