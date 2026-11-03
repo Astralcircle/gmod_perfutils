@@ -16,7 +16,11 @@ local function applyWrap()
 
     usermessage.IncomingMessage = function( name, msg )
         if not running then return um_IncomingMessage( name, msg ) end
-        local bits = msg:GetNumBitsLeft()
+
+        local bits = 0
+        for i = 1, 256 * 8 do if bf:ReadBool() then len = i end end
+		bf:Reset()
+
         local start = SysTime()
         um_IncomingMessage( name, msg )
         local elapsed = SysTime() - start
